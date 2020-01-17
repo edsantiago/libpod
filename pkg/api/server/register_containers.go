@@ -10,125 +10,66 @@ import (
 )
 
 func (s *APIServer) RegisterContainersHandlers(r *mux.Router) error {
-	// swagger:operation POST /containers/create compat createContainer
-	// ---
-	//   summary: Create a container
-	//   tags:
-	//    - containers (compat)
-	//   produces:
-	//   - application/json
-	//   parameters:
-	//    - in: query
-	//      name: name
-	//      type: string
-	//      description: container name
-	//   responses:
-	//     '201':
-	//         $ref: "#/responses/ContainerCreateResponse"
-	//     '400':
-	//         "$ref": "#/responses/BadParamError"
-	//     '404':
-	//         "$ref": "#/responses/NoSuchContainer"
-	//     '409':
-	//         "$ref": "#/responses/ConflictError"
-	//     '500':
-	//        "$ref": "#/responses/InternalError"
+	// == Create a container
+	// FIXME: what is the difference between 'summary' and 'description'?
+	//
+	//  ?name=string : container name
+	//
+	//  201  #ContainerCreateResponse
+	//  400  #BadParamError
+	//  404  #NoSuchContainer
+	//  409  #ConflictError
+	//  500  #InternalError
+	//
 	r.HandleFunc(VersionedPath("/containers/create"), APIHandler(s.Context, generic.CreateContainer)).Methods(http.MethodPost)
-	// swagger:operation GET /containers/json compat listContainers
-	// ---
-	//   tags:
-	//    - containers (compat)
-	// summary: List containers
+	// == List containers
 	// description: Returns a list of containers
-	// parameters:
-	//  - in: query
-	//    name: filters
-	//    type: string
-	//    description: |
-	//       Returns a list of containers.
-	//        - ancestor=(<image-name>[:<tag>], <image id>, or <image@digest>)
-	//        - before=(<container id> or <container name>)
-	//        - expose=(<port>[/<proto>]|<startport-endport>/[<proto>])
-	//        - exited=<int> containers with exit code of <int>
-	//        - health=(starting|healthy|unhealthy|none)
-	//        - id=<ID> a container's ID
-	//        - is-task=(true|false)
-	//        - label=key or label="key=value" of a container label
-	//        - name=<name> a container's name
-	//        - network=(<network id> or <network name>)
-	//        - publish=(<port>[/<proto>]|<startport-endport>/[<proto>])
-	//        - since=(<container id> or <container name>)
-	//        - status=(created|restarting|running|removing|paused|exited|dead)
-	//        - volume=(<volume name> or <mount point destination>)
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//        "$ref": "#/responses/DocsListContainer"
-	//   '400':
-	//       "$ref": "#/responses/BadParamError"
-	//   '500':
-	//      "$ref": "#/responses/InternalError"
+	//  ?filters=string |
+	//     Returns a list of containers.
+	//      - ancestor=(<image-name>[:<tag>], <image id>, or <image@digest>)
+	//      - before=(<container id> or <container name>)
+	//      - expose=(<port>[/<proto>]|<startport-endport>/[<proto>])
+	//      - exited=<int> containers with exit code of <int>
+	//      - health=(starting|healthy|unhealthy|none)
+	//      - id=<ID> a container's ID
+	//      - is-task=(true|false)
+	//      - label=key or label="key=value" of a container label
+	//      - name=<name> a container's name
+	//      - network=(<network id> or <network name>)
+	//      - publish=(<port>[/<proto>]|<startport-endport>/[<proto>])
+	//      - since=(<container id> or <container name>)
+	//      - status=(created|restarting|running|removing|paused|exited|dead)
+	//      - volume=(<volume name> or <mount point destination>)
+	//
+	//  200  #DocsListContainer
+	//  400  #BadParamError
+	//  500  #InternalError
+	//
 	r.HandleFunc(VersionedPath("/containers/json"), APIHandler(s.Context, generic.ListContainers)).Methods(http.MethodGet)
-	// swagger:operation POST /containers/prune compat pruneContainers
-	// ---
-	//   tags:
-	//    - containers (compat)
-	// summary: Delete stopped containers
+	// == Delete stopped containers
 	// description: Remove containers not in use
-	// parameters:
-	//  - in: query
-	//    name: filters
-	//    type: string
-	//    description:  |
+	//
+	// ?filters=string |
 	//      Filters to process on the prune list, encoded as JSON (a `map[string][]string`).  Available filters:
 	//       - `until=<timestamp>` Prune containers created before this timestamp. The `<timestamp>` can be Unix timestamps, date formatted timestamps, or Go duration strings (e.g. `10m`, `1h30m`) computed relative to the daemon machine’s time.
 	//       - `label` (`label=<key>`, `label=<key>=<value>`, `label!=<key>`, or `label!=<key>=<value>`) Prune containers with (or without, in case `label!=...` is used) the specified labels.
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//       "$ref": "#/responses/DocsContainerPruneReport"
-	//   '500':
-	//      "$ref": "#/responses/InternalError"
+	//
+	//  200 #DocsContainerPruneReport
+	//  500 #InternalError
 	r.HandleFunc(VersionedPath("/containers/prune"), APIHandler(s.Context, generic.PruneContainers)).Methods(http.MethodPost)
-	// swagger:operation DELETE /containers/{nameOrID} compat removeContainer
-	// ---
-	//   tags:
-	//    - containers (compat)
-	// summary: Remove a container
-	// parameters:
-	//  - in: path
-	//    name: nameOrID
-	//    required: true
-	//    description: the name or ID of the container
-	//  - in: query
-	//    name: force
-	//    type: bool
-	//    default: false
-	//    description: If the container is running, kill it before removing it.
-	//  - in: query
-	//    name: v
-	//    type: bool
-	//    default: false
-	//    description: Remove the volumes associated with the container.
-	//  - in: query
-	//    name: link
-	//    type: bool
-	//    description: not supported
-	// produces:
-	// - application/json
-	// responses:
-	//   '204':
-	//     description: no error
-	//   '400':
-	//       "$ref": "#/responses/BadParamError"
-	//   '404':
-	//       "$ref": "#/responses/NoSuchContainer"
-	//   '409':
-	//       "$ref": "#/responses/ConflictError"
-	//   '500':
-	//      "$ref": "#/responses/InternalError"
+	// == Remove a container
+	//
+	// /nameOrID=string*  the name or ID of the container
+	// ?force=bool[false] If container is running, kill it before removing it.
+	// ?v=bool[false]     Remove volumes associated with the container.
+	// ?link=bool         not supported
+	//
+	//  204 no error
+	//  400 #BadParamError
+	//  404 #NoSuchContainer
+	//  409 #ConflictError
+	//  500 #InternalError
+	//
 	r.HandleFunc(VersionedPath("/containers/{name:..*}"), APIHandler(s.Context, generic.RemoveContainer)).Methods(http.MethodDelete)
 	// swagger:operation GET /containers/{nameOrID}/json compat getContainer
 	// ---
