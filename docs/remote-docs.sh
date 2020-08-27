@@ -16,16 +16,17 @@ function usage() {
 }
 
 function fail() {
-    echo >&2 -e "$@\n"
-    usage
+    echo >&2 -e "$(dirname $0): $@\n"
     exit 1
 }
 
 case $PLATFORM in
 darwin|linux)
+    ext=1
     PUBLISHER=man_fn
     ;;
 windows)
+    ext=1.md
     PUBLISHER=html_fn
     ;;
 -help)
@@ -54,7 +55,7 @@ function man_fn() {
     local dir=$(dirname $page)
 
     if [[ ! -f $page ]]; then
-        page=$dir/links/${file%.*}.1
+        page=$dir/links/${file%.*}.$ext
     fi
     install $page $TARGET/${file%%.*}.1
 }
@@ -78,7 +79,7 @@ function html_fn() {
 function podman_commands() {
     $PODMAN help "$@" |\
         awk '/^Available Commands:/{ok=1;next}/^Flags:/{ok=0}ok { print $1 }' |\
-        grep . | grep -v help
+        grep .
 }
 
 function podman_all_commands(){
@@ -98,8 +99,14 @@ function pub_pages() {
 
     while IFS= read -r cmd; do
         file="podman-${cmd// /-}"
-        if [ -f $source/$file.1.md ]; then
-            $publisher $(echo $source/$file.1.md)
+
+        # Source dir may have man (.1) files (linux/darwin) or .1.md (windows)
+        # but the links subdir will always be .1 (man) files
+        if [ -f $source/$file.$ext -o -f $source/links/$file.1 ]; then
+            $publisher $(echo $source/$file.$ext)
+        else
+            # This is worth failing CI for
+            fail "no doc file nor link $source/$file.$ext for 'podman $cmd'"
         fi
     done <<< "$(podman_all_commands)"
 }
