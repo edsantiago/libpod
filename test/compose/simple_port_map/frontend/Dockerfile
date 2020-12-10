@@ -1,6 +1,7 @@
 FROM alpine
-WORKDIR /app 
+WORKDIR /app
+ENV ENV_PASSTHRU $ENV_PASSTHRU
 RUN apk update && apk add py3-pip && pip3 install flask
-COPY . /app 
-ENTRYPOINT ["python3"] 
+COPY . /app
+ENTRYPOINT ["python3"]
 CMD ["app.py"]
