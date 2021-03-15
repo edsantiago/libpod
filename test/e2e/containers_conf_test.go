@@ -308,10 +308,10 @@ var _ = Describe("Podman run", func() {
 
 		// Configuration that comes from remote client
 		// Timezone
-		session = podmanTest.Podman([]string{"run", ALPINE, "date", "+'%H %Z'"})
+		session = podmanTest.Podman([]string{"run", ALPINE, "date", "--date=202101010000", "+'%H %Z'"})
 		session.WaitWithDefaultTimeout()
 		Expect(session.ExitCode()).To(Equal(0))
-		Expect(session.OutputToString()).To(ContainSubstring("EST"))
+		Expect(session.OutputToString()).To(Equal("00 EST"))
 
 		// Umask
 		session = podmanTest.Podman([]string{"run", "--rm", ALPINE, "sh", "-c", "umask"})
