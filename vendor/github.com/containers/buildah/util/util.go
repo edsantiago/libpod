@@ -6,10 +6,13 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
 
+	"github.com/containers/buildah/define"
 	"github.com/containers/common/pkg/config"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/pkg/shortnames"
@@ -280,7 +283,7 @@ func Runtime() string {
 	conf, err := config.Default()
 	if err != nil {
 		logrus.Warnf("Error loading container config when searching for local runtime: %v", err)
-		return DefaultRuntime
+		return define.DefaultRuntime
 	}
 	return conf.Engine.OCIRuntime
 }
@@ -472,4 +475,27 @@ func MergeEnv(defaults, overrides []string) []string {
 		index[envVar[0]] = len(s) - 1
 	}
 	return s
+}
+
+type byDestination []specs.Mount
+
+func (m byDestination) Len() int {
+	return len(m)
+}
+
+func (m byDestination) Less(i, j int) bool {
+	return m.parts(i) < m.parts(j)
+}
+
+func (m byDestination) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+
+func (m byDestination) parts(i int) int {
+	return strings.Count(filepath.Clean(m[i].Destination), string(os.PathSeparator))
+}
+
+func SortMounts(m []specs.Mount) []specs.Mount {
+	sort.Sort(byDestination(m))
+	return m
 }
