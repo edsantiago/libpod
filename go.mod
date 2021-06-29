@@ -14,7 +14,7 @@ require (
 	github.com/containers/common v0.35.3
 	github.com/containers/conmon v2.0.20+incompatible
 	github.com/containers/image/v5 v5.10.5
-	github.com/containers/ocicrypt v1.1.0
+	github.com/containers/ocicrypt v1.1.2
 	github.com/containers/psgo v1.5.2
 	github.com/containers/storage v1.28.0
 	github.com/coreos/go-systemd/v22 v22.3.0
@@ -62,7 +62,7 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
 	go.etcd.io/bbolt v1.3.5
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20210315160823-c6e025ad8005
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
