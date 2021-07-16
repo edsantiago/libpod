@@ -3,6 +3,7 @@ package buildah
 import (
 	"context"
 
+	"github.com/containers/buildah/define"
 	"github.com/containers/buildah/docker"
 	"github.com/containers/buildah/util"
 	"github.com/containers/image/v5/image"
@@ -93,7 +94,7 @@ func importBuilderDataFromImage(ctx context.Context, store storage.Store, system
 		ImageAnnotations: map[string]string{},
 		ImageCreatedBy:   "",
 		NamespaceOptions: defaultNamespaceOptions,
-		IDMappingOptions: IDMappingOptions{
+		IDMappingOptions: define.IDMappingOptions{
 			HostUIDMapping: len(uidmap) == 0,
 			HostGIDMapping: len(uidmap) == 0,
 			UIDMap:         uidmap,
@@ -162,5 +163,6 @@ func importBuilderFromImage(ctx context.Context, store storage.Store, options Im
 		return nil, errors.Wrapf(err, "error importing build settings from image %q", options.Image)
 	}
 
+	builder.setupLogger()
 	return builder, nil
 }

@@ -10,11 +10,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/containers/buildah"
+	"github.com/containers/buildah/define"
 	"github.com/containers/buildah/pkg/completion"
 	"github.com/containers/buildah/pkg/parse"
-	"github.com/containers/buildah/util"
-	"github.com/containers/common/pkg/auth"
 	commonComp "github.com/containers/common/pkg/completion"
 	"github.com/containers/common/pkg/config"
 	"github.com/containers/storage/pkg/unshare"
@@ -66,7 +64,6 @@ type BudResults struct {
 	Iidfile             string
 	Label               []string
 	Logfile             string
-	Loglevel            int
 	Manifest            string
 	NoCache             bool
 	Timestamp           int64
@@ -77,6 +74,7 @@ type BudResults struct {
 	Rm                  bool
 	Runtime             string
 	RuntimeFlags        []string
+	Secrets             []string
 	SignaturePolicy     string
 	SignBy              string
 	Squash              bool
@@ -143,8 +141,8 @@ func GetNameSpaceFlags(flags *NameSpaceResults) pflag.FlagSet {
 	fs := pflag.FlagSet{}
 	fs.StringVar(&flags.IPC, string(specs.IPCNamespace), "", "'private', `path` of IPC namespace to join, or 'host'")
 	fs.StringVar(&flags.Network, string(specs.NetworkNamespace), "", "'private', 'none', 'ns:path' of network namespace to join, or 'host'")
-	fs.StringVar(&flags.CNIConfigDir, "cni-config-dir", util.DefaultCNIConfigDir, "`directory` of CNI configuration files")
-	fs.StringVar(&flags.CNIPlugInPath, "cni-plugin-path", util.DefaultCNIPluginPath, "`path` of CNI network plugins")
+	fs.StringVar(&flags.CNIConfigDir, "cni-config-dir", define.DefaultCNIConfigDir, "`directory` of CNI configuration files")
+	fs.StringVar(&flags.CNIPlugInPath, "cni-plugin-path", define.DefaultCNIPluginPath, "`path` of CNI network plugins")
 	fs.StringVar(&flags.PID, string(specs.PIDNamespace), "", "private, `path` of PID namespace to join, or 'host'")
 	fs.StringVar(&flags.UTS, string(specs.UTSNamespace), "", "private, :`path` of UTS namespace to join, or 'host'")
 	return fs
@@ -177,7 +175,7 @@ func GetBudFlags(flags *BudResults) pflag.FlagSet {
 	fs := pflag.FlagSet{}
 	fs.String("arch", runtime.GOARCH, "set the ARCH of the image to the provided value instead of the architecture of the host")
 	fs.StringArrayVar(&flags.Annotation, "annotation", []string{}, "Set metadata for an image (default [])")
-	fs.StringVar(&flags.Authfile, "authfile", auth.GetDefaultAuthFile(), "path of the authentication file.")
+	fs.StringVar(&flags.Authfile, "authfile", "", "path of the authentication file.")
 	fs.StringArrayVar(&flags.BuildArg, "build-arg", []string{}, "`argument=value` to supply to the builder")
 	fs.StringVar(&flags.CacheFrom, "cache-from", "", "Images to utilise as potential cache sources. The build process does not currently support caching so this is a NOOP.")
 	fs.StringVar(&flags.CertDir, "cert-dir", "", "use certificates at the specified path to access the registry")
@@ -193,7 +191,10 @@ func GetBudFlags(flags *BudResults) pflag.FlagSet {
 	fs.IntVar(&flags.Jobs, "jobs", 1, "how many stages to run in parallel")
 	fs.StringArrayVar(&flags.Label, "label", []string{}, "Set metadata for an image (default [])")
 	fs.StringVar(&flags.Logfile, "logfile", "", "log to `file` instead of stdout/stderr")
-	fs.IntVar(&flags.Loglevel, "loglevel", 0, "adjust logging level (range from -2 to 3)")
+	fs.Int("loglevel", 0, "NO LONGER USED, flag ignored, and hidden")
+	if err := fs.MarkHidden("loglevel"); err != nil {
+		panic(fmt.Sprintf("error marking the loglevel flag as hidden: %v", err))
+	}
 	fs.BoolVar(&flags.LogRusage, "log-rusage", false, "log resource usage at each build step")
 	if err := fs.MarkHidden("log-rusage"); err != nil {
 		panic(fmt.Sprintf("error marking the log-rusage flag as hidden: %v", err))
@@ -209,6 +210,7 @@ func GetBudFlags(flags *BudResults) pflag.FlagSet {
 	fs.BoolVar(&flags.Rm, "rm", true, "Remove intermediate containers after a successful build")
 	// "runtime" definition moved to avoid name collision in podman build.  Defined in cmd/buildah/bud.go.
 	fs.StringSliceVar(&flags.RuntimeFlags, "runtime-flag", []string{}, "add global flags for the container runtime")
+	fs.StringArrayVar(&flags.Secrets, "secret", []string{}, "secret file to expose to the build")
 	fs.StringVar(&flags.SignBy, "sign-by", "", "sign the image using a GPG key with the specified `FINGERPRINT`")
 	fs.StringVar(&flags.SignaturePolicy, "signature-policy", "", "`pathname` of signature policy file (not usually used)")
 	if err := fs.MarkHidden("signature-policy"); err != nil {
@@ -242,11 +244,11 @@ func GetBudFlagsCompletions() commonComp.FlagCompletions {
 	flagCompletion["jobs"] = commonComp.AutocompleteNone
 	flagCompletion["label"] = commonComp.AutocompleteNone
 	flagCompletion["logfile"] = commonComp.AutocompleteDefault
-	flagCompletion["loglevel"] = commonComp.AutocompleteDefault
 	flagCompletion["manifest"] = commonComp.AutocompleteDefault
 	flagCompletion["os"] = commonComp.AutocompleteNone
 	flagCompletion["platform"] = commonComp.AutocompleteNone
 	flagCompletion["runtime-flag"] = commonComp.AutocompleteNone
+	flagCompletion["secret"] = commonComp.AutocompleteNone
 	flagCompletion["sign-by"] = commonComp.AutocompleteNone
 	flagCompletion["signature-policy"] = commonComp.AutocompleteNone
 	flagCompletion["tag"] = commonComp.AutocompleteNone
@@ -361,7 +363,7 @@ func DefaultFormat() string {
 	if format != "" {
 		return format
 	}
-	return buildah.OCI
+	return define.OCI
 }
 
 // DefaultIsolation returns the default image format
@@ -373,7 +375,7 @@ func DefaultIsolation() string {
 	if unshare.IsRootless() {
 		return "rootless"
 	}
-	return buildah.OCI
+	return define.OCI
 }
 
 // DefaultHistory returns the default add-history setting
@@ -405,6 +407,8 @@ func AliasFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		name = "os"
 	case "purge":
 		name = "rm"
+	case "tty":
+		name = "terminal"
 	}
 	return pflag.NormalizedName(name)
 }
