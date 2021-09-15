@@ -11,27 +11,33 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
+	"sync"
 
-	"github.com/containers/buildah"
+	"github.com/containers/buildah/define"
+	"github.com/containers/buildah/util"
+	"github.com/containers/common/libimage"
 	"github.com/containers/common/pkg/config"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/manifest"
+	istorage "github.com/containers/image/v5/storage"
 	"github.com/containers/image/v5/types"
-	encconfig "github.com/containers/ocicrypt/config"
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/archive"
+	"github.com/hashicorp/go-multierror"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/openshift/imagebuilder"
 	"github.com/openshift/imagebuilder/dockerfile/parser"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
-	PullIfMissing = buildah.PullIfMissing
-	PullAlways    = buildah.PullAlways
-	PullIfNewer   = buildah.PullIfNewer
-	PullNever     = buildah.PullNever
+	PullIfMissing = define.PullIfMissing
+	PullAlways    = define.PullAlways
+	PullIfNewer   = define.PullIfNewer
+	PullNever     = define.PullNever
 
 	Gzip         = archive.Gzip
 	Bzip2        = archive.Bzip2
@@ -41,166 +47,32 @@ const (
 )
 
 // Mount is a mountpoint for the build container.
-type Mount specs.Mount
+type Mount = specs.Mount
 
-// BuildOptions can be used to alter how an image is built.
-type BuildOptions struct {
-	// ContextDirectory is the default source location for COPY and ADD
-	// commands.
-	ContextDirectory string
-	// PullPolicy controls whether or not we pull images.  It should be one
-	// of PullIfMissing, PullAlways, PullIfNewer, or PullNever.
-	PullPolicy buildah.PullPolicy
-	// Registry is a value which is prepended to the image's name, if it
-	// needs to be pulled and the image name alone can not be resolved to a
-	// reference to a source image.  No separator is implicitly added.
-	Registry string
-	// IgnoreUnrecognizedInstructions tells us to just log instructions we
-	// don't recognize, and try to keep going.
-	IgnoreUnrecognizedInstructions bool
-	// Manifest Name to which the image will be added.
-	Manifest string
-	// Quiet tells us whether or not to announce steps as we go through them.
-	Quiet bool
-	// Isolation controls how Run() runs things.
-	Isolation buildah.Isolation
-	// Runtime is the name of the command to run for RUN instructions when
-	// Isolation is either IsolationDefault or IsolationOCI.  It should
-	// accept the same arguments and flags that runc does.
-	Runtime string
-	// RuntimeArgs adds global arguments for the runtime.
-	RuntimeArgs []string
-	// TransientMounts is a list of mounts that won't be kept in the image.
-	TransientMounts []string
-	// Compression specifies the type of compression which is applied to
-	// layer blobs.  The default is to not use compression, but
-	// archive.Gzip is recommended.
-	Compression archive.Compression
-	// Arguments which can be interpolated into Dockerfiles
-	Args map[string]string
-	// Name of the image to write to.
-	Output string
-	// Additional tags to add to the image that we write, if we know of a
-	// way to add them.
-	AdditionalTags []string
-	// Log is a callback that will print a progress message.  If no value
-	// is supplied, the message will be sent to Err (or os.Stderr, if Err
-	// is nil) by default.
-	Log func(format string, args ...interface{})
-	// In is connected to stdin for RUN instructions.
-	In io.Reader
-	// Out is a place where non-error log messages are sent.
-	Out io.Writer
-	// Err is a place where error log messages should be sent.
-	Err io.Writer
-	// SignaturePolicyPath specifies an override location for the signature
-	// policy which should be used for verifying the new image as it is
-	// being written.  Except in specific circumstances, no value should be
-	// specified, indicating that the shared, system-wide default policy
-	// should be used.
-	SignaturePolicyPath string
-	// ReportWriter is an io.Writer which will be used to report the
-	// progress of the (possible) pulling of the source image and the
-	// writing of the new image.
-	ReportWriter io.Writer
-	// OutputFormat is the format of the output image's manifest and
-	// configuration data.
-	// Accepted values are buildah.OCIv1ImageManifest and buildah.Dockerv2ImageManifest.
-	OutputFormat string
-	// SystemContext holds parameters used for authentication.
-	SystemContext *types.SystemContext
-	// NamespaceOptions controls how we set up namespaces processes that we
-	// might need when handling RUN instructions.
-	NamespaceOptions []buildah.NamespaceOption
-	// ConfigureNetwork controls whether or not network interfaces and
-	// routing are configured for a new network namespace (i.e., when not
-	// joining another's namespace and not just using the host's
-	// namespace), effectively deciding whether or not the process has a
-	// usable network.
-	ConfigureNetwork buildah.NetworkConfigurationPolicy
-	// CNIPluginPath is the location of CNI plugin helpers, if they should be
-	// run from a location other than the default location.
-	CNIPluginPath string
-	// CNIConfigDir is the location of CNI configuration files, if the files in
-	// the default configuration directory shouldn't be used.
-	CNIConfigDir string
-	// ID mapping options to use if we're setting up our own user namespace
-	// when handling RUN instructions.
-	IDMappingOptions *buildah.IDMappingOptions
-	// AddCapabilities is a list of capabilities to add to the default set when
-	// handling RUN instructions.
-	AddCapabilities []string
-	// DropCapabilities is a list of capabilities to remove from the default set
-	// when handling RUN instructions. If a capability appears in both lists, it
-	// will be dropped.
-	DropCapabilities []string
-	// CommonBuildOpts is *required*.
-	CommonBuildOpts *buildah.CommonBuildOptions
-	// DefaultMountsFilePath is the file path holding the mounts to be mounted in "host-path:container-path" format
-	DefaultMountsFilePath string
-	// IIDFile tells the builder to write the image ID to the specified file
-	IIDFile string
-	// Squash tells the builder to produce an image with a single layer
-	// instead of with possibly more than one layer.
-	Squash bool
-	// Labels metadata for an image
-	Labels []string
-	// Annotation metadata for an image
-	Annotations []string
-	// OnBuild commands to be run by images based on this image
-	OnBuild []string
-	// Layers tells the builder to create a cache of images for each step in the Dockerfile
-	Layers bool
-	// NoCache tells the builder to build the image from scratch without checking for a cache.
-	// It creates a new set of cached images for the build.
-	NoCache bool
-	// RemoveIntermediateCtrs tells the builder whether to remove intermediate containers used
-	// during the build process. Default is true.
-	RemoveIntermediateCtrs bool
-	// ForceRmIntermediateCtrs tells the builder to remove all intermediate containers even if
-	// the build was unsuccessful.
-	ForceRmIntermediateCtrs bool
-	// BlobDirectory is a directory which we'll use for caching layer blobs.
-	BlobDirectory string
-	// Target the targeted FROM in the Dockerfile to build.
-	Target string
-	// Devices are the additional devices to add to the containers.
-	Devices []string
-	// SignBy is the fingerprint of a GPG key to use for signing images.
-	SignBy string
-	// Architecture specifies the target architecture of the image to be built.
-	Architecture string
-	// Timestamp sets the created timestamp to the specified time, allowing
-	// for deterministic, content-addressable builds.
-	Timestamp *time.Time
-	// OS is the specifies the operating system of the image to be built.
-	OS string
-	// MaxPullPushRetries is the maximum number of attempts we'll make to pull or push any one
-	// image from or to an external registry if the first attempt fails.
-	MaxPullPushRetries int
-	// PullPushRetryDelay is how long to wait before retrying a pull or push attempt.
-	PullPushRetryDelay time.Duration
-	// OciDecryptConfig contains the config that can be used to decrypt an image if it is
-	// encrypted if non-nil. If nil, it does not attempt to decrypt an image.
-	OciDecryptConfig *encconfig.DecryptConfig
-	// Jobs is the number of stages to run in parallel.  If not specified it defaults to 1.
-	Jobs *int
-	// LogRusage logs resource usage for each step.
-	LogRusage bool
-	// Excludes is a list of excludes to be used instead of the .dockerignore file.
-	Excludes []string
-	// From is the image name to use to replace the value specified in the first
-	// FROM instruction in the Containerfile
-	From string
-}
+type BuildOptions = define.BuildOptions
 
 // BuildDockerfiles parses a set of one or more Dockerfiles (which may be
-// URLs), creates a new Executor, and then runs Prepare/Execute/Commit/Delete
-// over the entire set of instructions.
-func BuildDockerfiles(ctx context.Context, store storage.Store, options BuildOptions, paths ...string) (string, reference.Canonical, error) {
+// URLs), creates one or more new Executors, and then runs
+// Prepare/Execute/Commit/Delete over the entire set of instructions.
+// If the Manifest option is set, returns the ID of the manifest list, else it
+// returns the ID of the built image, and if a name was assigned to it, a
+// canonical reference for that image.
+func BuildDockerfiles(ctx context.Context, store storage.Store, options define.BuildOptions, paths ...string) (id string, ref reference.Canonical, err error) {
 	if len(paths) == 0 {
 		return "", nil, errors.Errorf("error building: no dockerfiles specified")
 	}
+	if len(options.Platforms) > 1 && options.IIDFile != "" {
+		return "", nil, errors.Errorf("building multiple images, but iidfile %q can only be used to store one image ID", options.IIDFile)
+	}
+
+	logger := logrus.New()
+	if options.Err != nil {
+		logger.SetOutput(options.Err)
+	} else {
+		logger.SetOutput(os.Stderr)
+	}
+	logger.SetLevel(logrus.GetLevel())
+
 	var dockerfiles []io.ReadCloser
 	defer func(dockerfiles ...io.ReadCloser) {
 		for _, d := range dockerfiles {
@@ -208,11 +80,20 @@ func BuildDockerfiles(ctx context.Context, store storage.Store, options BuildOpt
 		}
 	}(dockerfiles...)
 
+	for _, tag := range append([]string{options.Output}, options.AdditionalTags...) {
+		if tag == "" {
+			continue
+		}
+		if _, err := util.VerifyTagName(tag); err != nil {
+			return "", nil, errors.Wrapf(err, "tag %s", tag)
+		}
+	}
+
 	for _, dfile := range paths {
 		var data io.ReadCloser
 
 		if strings.HasPrefix(dfile, "http://") || strings.HasPrefix(dfile, "https://") {
-			logrus.Debugf("reading remote Dockerfile %q", dfile)
+			logger.Debugf("reading remote Dockerfile %q", dfile)
 			resp, err := http.Get(dfile)
 			if err != nil {
 				return "", nil, err
@@ -236,12 +117,21 @@ func BuildDockerfiles(ctx context.Context, store storage.Store, options BuildOpt
 				return "", nil, err
 			}
 
+			var contents *os.File
 			// If given a directory, add '/Dockerfile' to it.
 			if dinfo.Mode().IsDir() {
-				dfile = filepath.Join(dfile, "Dockerfile")
+				for _, file := range []string{"Containerfile", "Dockerfile"} {
+					f := filepath.Join(dfile, file)
+					logger.Debugf("reading local %q", f)
+					contents, err = os.Open(f)
+					if err == nil {
+						break
+					}
+				}
+			} else {
+				contents, err = os.Open(dfile)
 			}
-			logrus.Debugf("reading local Dockerfile %q", dfile)
-			contents, err := os.Open(dfile)
+
 			if err != nil {
 				return "", nil, err
 			}
@@ -259,31 +149,176 @@ func BuildDockerfiles(ctx context.Context, store storage.Store, options BuildOpt
 
 		// pre-process Dockerfiles with ".in" suffix
 		if strings.HasSuffix(dfile, ".in") {
-			pData, err := preprocessDockerfileContents(data, options.ContextDirectory)
+			pData, err := preprocessContainerfileContents(logger, dfile, data, options.ContextDirectory)
 			if err != nil {
 				return "", nil, err
 			}
-			data = *pData
+			data = ioutil.NopCloser(pData)
 		}
 
 		dockerfiles = append(dockerfiles, data)
 	}
 
-	mainNode, err := imagebuilder.ParseDockerfile(dockerfiles[0])
+	var files [][]byte
+	for _, dockerfile := range dockerfiles {
+		var b bytes.Buffer
+		if _, err := b.ReadFrom(dockerfile); err != nil {
+			return "", nil, err
+		}
+		files = append(files, b.Bytes())
+	}
+
+	if options.Jobs != nil && *options.Jobs != 0 {
+		options.JobSemaphore = semaphore.NewWeighted(int64(*options.Jobs))
+	}
+
+	manifestList := options.Manifest
+	options.Manifest = ""
+	type instance struct {
+		v1.Platform
+		ID string
+	}
+	var instances []instance
+	var instancesLock sync.Mutex
+
+	var builds multierror.Group
+	if options.SystemContext == nil {
+		options.SystemContext = &types.SystemContext{}
+	}
+
+	if len(options.Platforms) == 0 {
+		options.Platforms = append(options.Platforms, struct{ OS, Arch, Variant string }{
+			OS:   options.SystemContext.OSChoice,
+			Arch: options.SystemContext.ArchitectureChoice,
+		})
+	}
+
+	systemContext := options.SystemContext
+	for _, platform := range options.Platforms {
+		platformContext := *systemContext
+		platformContext.OSChoice = platform.OS
+		platformContext.ArchitectureChoice = platform.Arch
+		platformContext.VariantChoice = platform.Variant
+		platformOptions := options
+		platformOptions.SystemContext = &platformContext
+		logPrefix := ""
+		if len(options.Platforms) > 1 {
+			logPrefix = "[" + platform.OS + "/" + platform.Arch
+			if platform.Variant != "" {
+				logPrefix += "/" + platform.Variant
+			}
+			logPrefix += "] "
+		}
+		builds.Go(func() error {
+			thisID, thisRef, err := buildDockerfilesOnce(ctx, store, logger, logPrefix, platformOptions, paths, files)
+			if err != nil {
+				return err
+			}
+			id, ref = thisID, thisRef
+			instancesLock.Lock()
+			instances = append(instances, instance{
+				ID: thisID,
+				Platform: v1.Platform{
+					OS:           platformContext.OSChoice,
+					Architecture: platformContext.ArchitectureChoice,
+					Variant:      platformContext.VariantChoice,
+				},
+			})
+			instancesLock.Unlock()
+			return nil
+		})
+	}
+
+	if merr := builds.Wait(); merr != nil {
+		if merr.Len() == 1 {
+			return "", nil, merr.Errors[0]
+		}
+		return "", nil, merr.ErrorOrNil()
+	}
+
+	if manifestList != "" {
+		rt, err := libimage.RuntimeFromStore(store, nil)
+		if err != nil {
+			return "", nil, err
+		}
+		// Create the manifest list ourselves, so that it's not in a
+		// partially-populated state at any point if we're creating it
+		// fresh.
+		list, err := rt.LookupManifestList(manifestList)
+		if err != nil && errors.Cause(err) == storage.ErrImageUnknown {
+			list, err = rt.CreateManifestList(manifestList)
+		}
+		if err != nil {
+			return "", nil, err
+		}
+		// Add each instance to the list in turn.
+		storeTransportName := istorage.Transport.Name()
+		for _, instance := range instances {
+			instanceDigest, err := list.Add(ctx, storeTransportName+":"+instance.ID, nil)
+			if err != nil {
+				return "", nil, err
+			}
+			err = list.AnnotateInstance(instanceDigest, &libimage.ManifestListAnnotateOptions{
+				Architecture: instance.Architecture,
+				OS:           instance.OS,
+				Variant:      instance.Variant,
+			})
+			if err != nil {
+				return "", nil, err
+			}
+		}
+		id, ref = list.ID(), nil
+		// Put together a canonical reference
+		storeRef, err := istorage.Transport.NewStoreReference(store, nil, list.ID())
+		if err != nil {
+			return "", nil, err
+		}
+		imgSource, err := storeRef.NewImageSource(ctx, nil)
+		if err != nil {
+			return "", nil, err
+		}
+		defer imgSource.Close()
+		manifestBytes, _, err := imgSource.GetManifest(ctx, nil)
+		if err != nil {
+			return "", nil, err
+		}
+		manifestDigest, err := manifest.Digest(manifestBytes)
+		if err != nil {
+			return "", nil, err
+		}
+		img, err := store.Image(id)
+		if err != nil {
+			return "", nil, err
+		}
+		for _, name := range img.Names {
+			if named, err := reference.ParseNamed(name); err == nil {
+				if r, err := reference.WithDigest(reference.TrimNamed(named), manifestDigest); err == nil {
+					ref = r
+					break
+				}
+			}
+		}
+	}
+
+	return id, ref, nil
+}
+
+func buildDockerfilesOnce(ctx context.Context, store storage.Store, logger *logrus.Logger, logPrefix string, options define.BuildOptions, dockerfiles []string, dockerfilecontents [][]byte) (string, reference.Canonical, error) {
+	mainNode, err := imagebuilder.ParseDockerfile(bytes.NewReader(dockerfilecontents[0]))
 	if err != nil {
 		return "", nil, errors.Wrapf(err, "error parsing main Dockerfile: %s", dockerfiles[0])
 	}
 
-	warnOnUnsetBuildArgs(mainNode, options.Args)
+	warnOnUnsetBuildArgs(logger, mainNode, options.Args)
 
-	for _, d := range dockerfiles[1:] {
-		additionalNode, err := imagebuilder.ParseDockerfile(d)
+	for i, d := range dockerfilecontents[1:] {
+		additionalNode, err := imagebuilder.ParseDockerfile(bytes.NewReader(d))
 		if err != nil {
-			return "", nil, errors.Wrapf(err, "error parsing additional Dockerfile %s", d)
+			return "", nil, errors.Wrapf(err, "error parsing additional Dockerfile %s", dockerfiles[i])
 		}
 		mainNode.Children = append(mainNode.Children, additionalNode.Children...)
 	}
-	exec, err := NewExecutor(store, options, mainNode)
+	exec, err := newExecutor(logger, logPrefix, store, options, mainNode)
 	if err != nil {
 		return "", nil, errors.Wrapf(err, "error creating build executor")
 	}
@@ -307,13 +342,24 @@ func BuildDockerfiles(ctx context.Context, store storage.Store, options BuildOpt
 	return exec.Build(ctx, stages)
 }
 
-func warnOnUnsetBuildArgs(node *parser.Node, args map[string]string) {
+func warnOnUnsetBuildArgs(logger *logrus.Logger, node *parser.Node, args map[string]string) {
+	argFound := make(map[string]bool)
 	for _, child := range node.Children {
 		switch strings.ToUpper(child.Value) {
 		case "ARG":
 			argName := child.Next.Value
-			if _, ok := args[argName]; !strings.Contains(argName, "=") && !ok {
-				logrus.Warnf("missing %q build argument. Try adding %q to the command line", argName, fmt.Sprintf("--build-arg %s=<VALUE>", argName))
+			if strings.Contains(argName, "=") {
+				res := strings.Split(argName, "=")
+				if res[1] != "" {
+					argFound[res[0]] = true
+				}
+			}
+			argHasValue := true
+			if !strings.Contains(argName, "=") {
+				argHasValue = argFound[argName]
+			}
+			if _, ok := args[argName]; !argHasValue && !ok {
+				logger.Warnf("missing %q build argument. Try adding %q to the command line", argName, fmt.Sprintf("--build-arg %s=<VALUE>", argName))
 			}
 		default:
 			continue
@@ -321,53 +367,36 @@ func warnOnUnsetBuildArgs(node *parser.Node, args map[string]string) {
 	}
 }
 
-// preprocessDockerfileContents runs CPP(1) in preprocess-only mode on the input
+// preprocessContainerfileContents runs CPP(1) in preprocess-only mode on the input
 // dockerfile content and will use ctxDir as the base include path.
-//
-// Note: we cannot use cmd.StdoutPipe() as cmd.Wait() closes it.
-func preprocessDockerfileContents(r io.Reader, ctxDir string) (rdrCloser *io.ReadCloser, err error) {
-	cppPath := "/usr/bin/cpp"
-	if _, err = os.Stat(cppPath); err != nil {
+func preprocessContainerfileContents(logger *logrus.Logger, containerfile string, r io.Reader, ctxDir string) (stdout io.Reader, err error) {
+	cppCommand := "cpp"
+	cppPath, err := exec.LookPath(cppCommand)
+	if err != nil {
 		if os.IsNotExist(err) {
-			err = errors.Errorf("error: Dockerfile.in support requires %s to be installed", cppPath)
+			err = errors.Errorf("error: %s support requires %s to be installed", containerfile, cppPath)
 		}
 		return nil, err
 	}
 
-	stdout := bytes.Buffer{}
-	stderr := bytes.Buffer{}
+	stdoutBuffer := bytes.Buffer{}
+	stderrBuffer := bytes.Buffer{}
 
 	cmd := exec.Command(cppPath, "-E", "-iquote", ctxDir, "-traditional", "-undef", "-")
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	pipe, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err != nil {
-			pipe.Close()
-		}
-	}()
+	cmd.Stdin = r
+	cmd.Stdout = &stdoutBuffer
+	cmd.Stderr = &stderrBuffer
 
 	if err = cmd.Start(); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "preprocessing %s", containerfile)
 	}
-
-	if _, err = io.Copy(pipe, r); err != nil {
-		return nil, err
-	}
-
-	pipe.Close()
 	if err = cmd.Wait(); err != nil {
-		if stderr.Len() > 0 {
-			err = errors.Wrapf(err, "%v", strings.TrimSpace(stderr.String()))
+		if stderrBuffer.Len() != 0 {
+			logger.Warnf("Ignoring %s\n", stderrBuffer.String())
 		}
-		return nil, errors.Wrapf(err, "error pre-processing Dockerfile")
+		if stdoutBuffer.Len() == 0 {
+			return nil, errors.Wrapf(err, "error preprocessing %s: preprocessor produced no output", containerfile)
+		}
 	}
-
-	rc := ioutil.NopCloser(bytes.NewReader(stdout.Bytes()))
-	return &rc, nil
+	return &stdoutBuffer, nil
 }
