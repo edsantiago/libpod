@@ -29,10 +29,8 @@ our $Query = '{
       number
       title
       labels(first:30) {
-        edges {
-          node {
-            name
-          }
+        nodes {
+          name
         }
       }
     }
