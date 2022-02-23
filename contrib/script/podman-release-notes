@@ -19,13 +19,19 @@ use warnings;
 # For debugging, show data structures using DumpTree($var)
 #use Data::TreeDumper; $Data::TreeDumper::Displayaddress = 0;
 
+use LWP::UserAgent;
+use JSON::XS;
+
 ###############################################################################
 # BEGIN user-customizable section
 
+our $URL = 'https://api.github.com/graphql';
+
+
 # WOOT! 2022-02-22 this gives us labels for a given PR
-our $Query = '{
+our $Query_Labels = '{
   repository(owner: "containers", name: "podman") {
-    pullRequest(number: 13247) {
+    pullRequest(number: %d) {
       number
       title
       labels(first:30) {
@@ -35,20 +41,7 @@ our $Query = '{
       }
     }
   }
-}
-'
-
-
-
-
-
-
-
-
-# Set up safe, well-known environment
-$ENV{PATH}   = '/usr/bin:/bin';
-$ENV{CDPATH} = '';
-$ENV{IFS}    = '';
+}';
 
 # END   user-customizable section
 ###############################################################################
@@ -68,43 +61,11 @@ OPTIONS:
   -n, --dry-run  make no actual changes
 
   --help         display this message
-  --man          display program man page
   --version      display program name and version
 END_USAGE
 
     exit;
 }
-
-sub man {
-    # Read the POD contents.  If it hasn't been filled in yet, abort.
-    my $pod = do { local $/; <DATA>; };
-    if ($pod =~ /=head1 \s+ NAME \s+ FIXME/xm) {
-        warn "$ME: No man page available.  Please try $ME --help\n";
-        exit;
-    }
-
-    # Use Pod::Man to convert our __DATA__ section to *roff
-    eval { require Pod::Man }
-        or die "$ME: Cannot generate man page; Pod::Man unavailable: $@\n";
-    my $parser = Pod::Man->new(name => $ME, release => $VERSION, section => 1);
-
-    # If called without output redirection, man-ify.
-    my $out_fh;
-    if (-t *STDOUT) {
-        my $pager = $ENV{MANPAGER} || $ENV{PAGER} || 'less';
-        open $out_fh, "| nroff -man | $pager";
-    }
-    else {
-        open $out_fh, '>&STDOUT';
-    }
-
-    # Read the POD contents, and have Pod::Man read from fake filehandle.
-    # This requires 5.8.0.
-    open my $pod_handle, '<', \$pod;
-    $parser->parse_from_filehandle($pod_handle, $out_fh);
-    exit;
-}
-
 
 # Command-line options.  Note that this operates directly on @ARGV !
 our $debug   = 0;
@@ -120,7 +81,6 @@ sub handle_opts {
         'verbose|v'  => \$verbose,
 
         help         => \&usage,
-        man          => \&man,
         version      => sub { print "$ME version $VERSION\n"; exit 0 },
     ) or die "Try `$ME --help' for help\n";
 }
@@ -141,91 +101,55 @@ sub main {
     handle_opts();                      # will set package globals
 
     # Fetch command-line arguments.  Barf if too many.
-    my $arg1 = shift(@ARGV)
-        or die "$ME: missing ARG1 argument; try $ME --help\n";
+    my $pr = shift(@ARGV)
+        or die "$ME: missing PR argument; try $ME --help\n";
     die "$ME: Too many arguments; try $ME --help\n"                 if @ARGV;
 
-    # FIXME: do code here
+    # FIXME: first do a git log, get PRs
+    # FIXME: get release-notes data from commit message? github description?
+    doit($pr);
 }
 
 
-1;
+sub doit {
+    my $pr = shift;
 
-__DATA__
-
-###############################################################################
-#
-# Documentation
-#
-
-=head1	NAME
-
-FIXME - description of what this script does
-
-=head1	SYNOPSIS
-
-FIXME [B<--foo>]  [B<--bar>]  [B<--verbose>] ARG1 [ARG2...] FIXME
-
-FIXME  B<--help>  |  B<--version> | B<--man>
-
-=head1	DESCRIPTION
-
-B<FIXME> grobbles the frobniz on alternate Tuesdays, except where
-prohibited by law.
-
-=head1	OPTIONS
-
-=over 4
-
-=item B<--foo>
-
-FIXME
-
-=item B<--verbose>
-
-Show progress messages.
-
-=item B<--help>
-
-Emit usage hints.
-
-=item B<--version>
-
-Display program version.
-
-=item B<--man>
-
-Display this man page.
-
-=back
+    # FIXME: get PR state, confirm merged?
+    my $result = graphql_query(sprintf($Query_Labels, $pr));
+    use Data::Dump; dd $result;
+    my @labels = map { $_->{name} } @{$result->{data}{repository}{pullRequest}{labels}{nodes}};
+    use Data::Dump; dd \@labels;
+}
 
 
-=head1	DIAGNOSTICS
+###################
+#  graphql_query  #  Send a graphql query to host, return json response
+###################
+sub graphql_query {
+    my $query = shift;
 
-FIXME
+    my $ua = LWP::UserAgent->new;
+    $ua->agent("$ME " . $ua->agent);              # Identify ourself
 
-=head1	ENVIRONMENT
+    my %headers = (
+        'Authorization' => "bearer $ENV{GITHUB_TOKEN}",
+        'Accept'        => "application/vnd.github.antiope-preview+json",
+        'Content-Type'  => "application/json",
+    );
+    $ua->default_header($_ => $headers{$_}) for keys %headers;
 
-FIXME
+    # Escape quotes
+    $query =~ s/\"/\\"/g; $query =~ s/\n/ /g; $query =~ s/\s+/ /g;
+    my $postquery = qq/{ "query": "$query" }/;
+#    print $postquery; exit 0;
 
-=head1	FILES
+    my $res = $ua->post($URL, Content => $postquery);
+    if ((my $code = $res->code) != 200) {
+        use Term::ANSIColor qw(:constants);
+        printf "%s%03d%s", ($code < 400 ? YELLOW : RED), $code, RESET;
+        use Data::Dumper; print Dumper($res);
+        exit 1;
+    }
 
-FIXME
-
-=head1	RESTRICTIONS
-
-FIXME
-
-=head1	SEE ALSO
-
-FIXME
-
-e.g. L<Foo::Bar|Foo::Bar>
-
-=head1	AUTHOR
-
-Your Name <ed@edsantiago.com>
-
-Please report bugs or suggestions to <ed@edsantiago.com>
-
-=cut
+    return decode_json($res->content);
+}
