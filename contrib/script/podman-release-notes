@@ -27,7 +27,6 @@ use JSON::XS;
 
 our $URL = 'https://api.github.com/graphql';
 
-
 # WOOT! 2022-02-22 this gives us labels for a given PR
 our $Query_Labels = '{
   repository(owner: "containers", name: "podman") {
@@ -42,6 +41,8 @@ our $Query_Labels = '{
     }
   }
 }';
+
+our %By_Label;
 
 # END   user-customizable section
 ###############################################################################
@@ -114,12 +115,19 @@ sub main {
     for my $pr (@prs) {
         doit($pr);
     }
+
+    for my $k ("kind/bug", "breaking-change", "HTTP API") {
+        print "\n", $k, "\n";
+        for my $tuple (@{$By_Label{$k}}) {
+            printf "  %6d %s\n", @$tuple;
+        }
+    }
 }
 
 sub get_prs {
     my @prs;
 
-    my @cmd = qw(git log --merges --no-decorate c2f4747fe..HEAD);
+    my @cmd = qw(git log --merges --no-decorate f69fcb248..v4.0.0);
     open my $git_fh, '-|', @cmd
         or die "$ME: Cannot fork: $!\n";
     while (my $line = <$git_fh>) {
@@ -141,7 +149,10 @@ sub doit {
 #    use Data::Dump; dd $result;
     my @labels = map { $_->{name} } @{$result->{data}{repository}{pullRequest}{labels}{nodes}};
     #use Data::Dump; dd \@labels;
-    printf "%5d %s\n", $pr, join(" ", @labels);
+    printf "%5d %s\n", $pr, join(", ", @labels);
+    for my $l (@labels) {
+        push @{ $By_Label{$l} }, [ $pr, $result->{data}{repository}{pullRequest}{title} ];
+    }
 }
 
 
