@@ -106,8 +106,29 @@ sub main {
     die "$ME: Too many arguments; try $ME --help\n"                 if @ARGV;
 
     # FIXME: first do a git log, get PRs
+    #   git log --merges --no-decorate c2f4747fe..HEAD
+    my @prs = get_prs();
+
     # FIXME: get release-notes data from commit message? github description?
-    doit($pr);
+    # FIXME: show PR description / link, so Matt/reviewer can confirm?
+    for my $pr (@prs) {
+        doit($pr);
+    }
+}
+
+sub get_prs {
+    my @prs;
+
+    my @cmd = qw(git log --merges --no-decorate c2f4747fe..HEAD);
+    open my $git_fh, '-|', @cmd
+        or die "$ME: Cannot fork: $!\n";
+    while (my $line = <$git_fh>) {
+        push @prs, $1 if $line =~ /^\s*Merge pull request \#(\d+) from/;
+    }
+    close $git_fh
+        or die "$ME: Error running @cmd: $!\n";
+
+    return @prs;
 }
 
 
@@ -115,10 +136,12 @@ sub doit {
     my $pr = shift;
 
     # FIXME: get PR state, confirm merged?
+    # FIXME: find out if this PR closed an open issue?
     my $result = graphql_query(sprintf($Query_Labels, $pr));
-    use Data::Dump; dd $result;
+#    use Data::Dump; dd $result;
     my @labels = map { $_->{name} } @{$result->{data}{repository}{pullRequest}{labels}{nodes}};
-    use Data::Dump; dd \@labels;
+    #use Data::Dump; dd \@labels;
+    printf "%5d %s\n", $pr, join(" ", @labels);
 }
 
 
