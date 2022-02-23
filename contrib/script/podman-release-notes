@@ -38,6 +38,11 @@ our $Query_Labels = '{
           name
         }
       }
+      closingIssuesReferences(first:30) {
+        nodes {
+          number
+        }
+      }
     }
   }
 }';
@@ -144,7 +149,7 @@ sub doit {
     my $pr = shift;
 
     # FIXME: get PR state, confirm merged?
-    # FIXME: find out if this PR closed an open issue?
+    # FIXME: find out if this PR closed an open issue? ("Linked issues")
     my $result = graphql_query(sprintf($Query_Labels, $pr));
 #    use Data::Dump; dd $result;
     my @labels = map { $_->{name} } @{$result->{data}{repository}{pullRequest}{labels}{nodes}};
