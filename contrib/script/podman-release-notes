@@ -151,12 +151,15 @@ sub doit {
     # FIXME: get PR state, confirm merged?
     # FIXME: find out if this PR closed an open issue? ("Linked issues")
     my $result = graphql_query(sprintf($Query_Labels, $pr));
-#    use Data::Dump; dd $result;
-    my @labels = map { $_->{name} } @{$result->{data}{repository}{pullRequest}{labels}{nodes}};
+    #    use Data::Dump; dd $result;
+    my $info = $result->{data}{repository}{pullRequest};
+    my @labels = map { $_->{name} } @{$info->{labels}{nodes}};
+    my @closes = map { $_->{number} } @{$info->{closingIssuesReferences}{nodes}};
+
     #use Data::Dump; dd \@labels;
     printf "%5d %s\n", $pr, join(", ", @labels);
     for my $l (@labels) {
-        push @{ $By_Label{$l} }, [ $pr, $result->{data}{repository}{pullRequest}{title} ];
+        push @{ $By_Label{$l} }, [ $pr, $info->{title} ];
     }
 }
 
