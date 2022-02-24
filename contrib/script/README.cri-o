@@ -1,0 +1,103 @@
+How cri-o seems to do things.
+
+Going from github to release notes: Example:
+
+This is a closed PR with a description:
+
+   https://github.com/cri-o/cri-o/pull/5547
+      [1.22] prepend commands with taskset if InfraCtrCPUSet is configured
+      [opened Jan 17, merged into cri-o:release-1.22 on Jan 19]
+
+      Does this PR introduce a user-facing change?
+
+      Add functionality to use taskset to spawn new commands cri-o
+      runs. Now, if InfraCtrCPUSet is called, all newly spawned
+      ...
+      Add functionality to use taskset to spawn new commands cri-o runs.
+      Now, if InfraCtrCPUSet is called, all newly spawned commands will
+      be placed in the InfraCtrCPUSet (as it's expected to be set to the
+      reserved CPU set that system commands should run on).
+
+      labels: kind/feature, release-note
+
+      [that text is inside a ```release-note markdown section]
+
+That comment  appears in the 1.22 release notes:
+
+   https://cri-o.github.io/cri-o/v1.22.2.html
+      Changelog since v1.22.1
+       Changes by Kind
+        Feature
+
+        Add functionality to use taskset to spawn new commands cri-o runs.
+        Now, if InfraCtrCPUSet is called, all newly spawned commands will
+        be placed in the InfraCtrCPUSet (as it’s expected to be set to the
+        reserved CPU set that system commands should run on).
+        (#5547, @haircommander)
+
+The actual merge commit is six individual commits:
+
+   *   ac40287dc by OpenShift Merge Robot (2022-01-19 06:42:59 -0700)
+   |\  Merge pull request #5547 from haircommander/taskset-prepend-1.22
+   | | [1.22] prepend commands with taskset if InfraCtrCPUSet is configured
+   | * 51b9a7e0d by Peter Hunt (2022-01-17 11:05:24 -0700)
+   | | use cmdrunner singleton
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   | * 3ab2b7ab6 by Peter Hunt (2022-01-17 11:04:38 -0700)
+   | | conmonmgr: refactor for new CommandRunner
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   | * 1ee770c1a by Peter Hunt (2022-01-17 11:04:38 -0700)
+   | | cmdrunner: update mocks and add target to makefile
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   | * 4a86e40c8 by Peter Hunt (2022-01-17 11:04:38 -0700)
+   | | config: prepend commands with taskset if InfraCtrCPUSet is configured
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   | * 17cf448f7 by Peter Hunt (2022-01-17 11:04:38 -0700)
+   | | cmdrunner: add tests for prepended commands
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   | * ef9d873da by Peter Hunt (2022-01-17 11:04:37 -0700)
+   | | cmdrunner: create singleton
+   | | Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   | |
+   * |   936ed819c by OpenShift Merge Robot (2022-01-18 11:44:05 -0700)
+   |\ \  Merge pull request #5545 from openshift-cherrypick-robot/cherry-pick-5535-to-release-1.22
+   | |/  [release-1.22] Use timeout for conmon cgroup move
+   |/|
+   | * 257889b26 by Sascha Grunert (2022-01-17 11:02:47 -0700)
+   |/  Use timeout for conmon cgroup move
+   |   We're now using a timeout which is able to unblock gaining
+   |   the sandbox mutex in a container creation vs sandbox stop race.
+   |
+   |   Signed-off-by: Sascha Grunert <sgrunert@redhat.com>
+   |   Signed-off-by: Peter Hunt <pehunt@redhat.com>
+   |
+   *   f1d2c6e33 by OpenShift Merge Robot (2021-12-16 00:55:48 -0700)
+
+----------------------------------------------------------------------------
+
+Process: release notes are in the cri-o repo, in a completely unrelated
+branch named gh-pages. All commits are done by 'Anago GCB'
+
+Bot called openshift-cherrypick-robot seems to be triggered manually:
+
+   https://github.com/cri-o/cri-o/pull/5663
+      @openshift-merge-robot openshift-merge-robot merged ...
+      kolyshkin commented 3 days ago
+
+      /cherry-pick release-1.23
+      /cherry-pick release-1.22
+
+----------------------------------------------------------------------------
+
+TOOLS
+
+https://pkg.go.dev/k8s.io/release/pkg/notes
+   useless page
+
+https://github.com/kubernetes/release/blob/master/cmd/release-notes/README.md
+   actual page with documentation
