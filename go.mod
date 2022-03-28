@@ -54,7 +54,7 @@ require (
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/rootless-containers/rootlesskit v0.14.6
+	github.com/rootless-containers/rootlesskit v1.0.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
@@ -67,7 +67,7 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
+	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 	golang.org/x/text v0.3.7
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/inf.v0 v0.9.1
