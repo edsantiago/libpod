@@ -101,3 +101,16 @@ https://pkg.go.dev/k8s.io/release/pkg/notes
 
 https://github.com/kubernetes/release/blob/master/cmd/release-notes/README.md
    actual page with documentation
+
+----------------------------------------------------------------------------
+
+2022-04-28 getting back to this
+
+  - Adding 'kind/bug' label to a github PR, via UI, changes the
+    resulting .md from '### Uncategorized' to '### Bug or Regression'.
+
+  - Changing 'branch=v4.1' to 'branch=main' in script causes three more
+    issues to appear:
+      - 14047 (podman search, uncategorized)
+      - 14053 (autocompletion, uncategorized)
+      - 14051 (noquota, feature)
