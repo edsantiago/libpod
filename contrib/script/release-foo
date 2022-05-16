@@ -1,15 +1,32 @@
 #!/bin/sh
 
+set -ex
+
 RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
 
+# FIXME
+WANT=v4.1
+
+# Pull and make sure repo is up-to-date
+git fetch upstream
+git checkout $WANT
+git pull
+
+start_sha=$(git merge-base $WANT main)
+end_sha=$(git rev-parse HEAD)
+
 $RN --org=containers --repo=podman \
-    --branch=v4.1 \
-    --repo-path=/var/tmp/pmpm \
+    --branch=$WANT \
+    --repo-path=/var/tmp/pmpm$$ \
     --required-author= \
-    --start-sha=9133a6d044c0ab525cc087ca12c1bbc005f5f325 \
-    --end-sha=cedbbfa543651a13055a1fe093a4d0a2a28ccdfd \
+    --start-sha=$start_sha \
+    --end-sha=$end_sha \
     --output=/tmp/esm-esm.md \
     --toc
 
+git checkout podman-release-notes
+mv /tmp/esm-esm.md $WANT.md
+git add $WANT.md
+git commit -m"release notes for $WANT"
 
 # --required-author= --start-rev=v1.22.0 --end-sha=7e218a36eb7c48c6d0f5de65523e238b04f2b313 --output=/home/esm/src/atomic/2017-09.cri-o/cri-o/build/release-notes/v1.23.0.md --toc --go-template=go-template:/dev/shm/258053125
