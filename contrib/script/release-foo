@@ -27,6 +27,6 @@ $RN --org=containers --repo=podman \
 git checkout podman-release-notes
 mv /tmp/esm-esm.md $WANT.md
 git add $WANT.md
-git commit -m"release notes for $WANT"
+git commit -m"release notes for $WANT" $WANT.md
 
 # --required-author= --start-rev=v1.22.0 --end-sha=7e218a36eb7c48c6d0f5de65523e238b04f2b313 --output=/home/esm/src/atomic/2017-09.cri-o/cri-o/build/release-notes/v1.23.0.md --toc --go-template=go-template:/dev/shm/258053125
