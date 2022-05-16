@@ -3,11 +3,11 @@
 RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
 
 $RN --org=containers --repo=podman \
-    --branch=main \
+    --branch=v4.1 \
     --repo-path=/var/tmp/pmpm \
     --required-author= \
-    --start-sha=e47dda5d81772fcc1c2417062303681a72780bbd \
-    --end-sha=2e9f792e378491acc3c04ba389ec7cf15bef471e \
+    --start-sha=9133a6d044c0ab525cc087ca12c1bbc005f5f325 \
+    --end-sha=cedbbfa543651a13055a1fe093a4d0a2a28ccdfd \
     --output=/tmp/esm-esm.md \
     --toc
 
