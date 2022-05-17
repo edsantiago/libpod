@@ -102,6 +102,9 @@ https://pkg.go.dev/k8s.io/release/pkg/notes
 https://github.com/kubernetes/release/blob/master/cmd/release-notes/README.md
    actual page with documentation
 
+https://github.com/kubernetes/community/blob/master/contributors/guide/release-notes.md
+    process documentation (style info, no details about bots)
+
 ----------------------------------------------------------------------------
 
 2022-04-28 getting back to this
@@ -114,3 +117,20 @@ https://github.com/kubernetes/release/blob/master/cmd/release-notes/README.md
       - 14047 (podman search, uncategorized)
       - 14053 (autocompletion, uncategorized)
       - 14051 (noquota, feature)
+
+----------------------------------------------------------------------------
+
+2022-05-17 openshift bot
+
+  PR labels on cri-o
+    - release-note
+           - https://github.com/cri-o/cri-o/pull/5854
+    - release-note-none
+           - if explicit None:    https://github.com/cri-o/cri-o/pull/5773
+           - if dependabot        https://github.com/cri-o/cri-o/pull/5881
+                  - done in .github/dependabot
+    - do-not-merge/release-note-label-needed
+           - https://github.com/cri-o/cri-o/pull/5755
+
+    (unknown: how openshift-ci bot sets those)
+    (unknown: how the do-not-merge label blocks)
