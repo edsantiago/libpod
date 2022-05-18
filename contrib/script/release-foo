@@ -7,7 +7,8 @@ set -ex
 RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
 
 # FIXME
-WANT=v4.1
+#WANT=v4.1
+WANT=${1?Usage: $ME TAG, where TAG is e.g. v4.1}
 
 # Pull and make sure repo is up-to-date
 git fetch upstream

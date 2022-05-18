@@ -134,3 +134,18 @@ https://github.com/kubernetes/community/blob/master/contributors/guide/release-n
 
     (unknown: how openshift-ci bot sets those)
     (unknown: how the do-not-merge label blocks)
+      * SOLVED: https://github.com/openshift/release/pull/28686
+
+----------------------------------------------------------------------------
+
+2022-05-18 decisions
+
+   HOW/WHERE DOES THIS RUN?
+    - from branch itself (too hard to maintain)
+    - from gh-pages branch like cri-o (nah, we don't need gh-pages)
+    - from another repo in the containers project?
+    - from another repo entirely?
+
+   go get k8s.io/release/cmd/release-notes
+
+  (TODO: add kind/api-change label to podman)
