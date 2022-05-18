@@ -1,5 +1,7 @@
 #!/bin/sh
 
+ME=$(basename $0)
+
 set -ex
 
 RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
@@ -15,6 +17,32 @@ git pull
 start_sha=$(git merge-base $WANT main)
 end_sha=$(git rev-parse HEAD)
 
+# Write template file
+template=$(mktemp --tmpdir $ME.tmp.XXXXXXX)
+cat >| $template <<EOF
+# Podman $WANT
+
+The release notes have been generated for the commit range
+[FIXME...FIXME](https://github.com/containers/podman/compare/FIXME...FIXME) on $WANT.
+
+# Changelog since FIXME-starttag
+
+{{with .NotesWithActionRequired -}}
+## Urgent Upgrade Notes
+
+{{range .}} {{println "-" .}} {{end}}
+{{end}}
+
+{{- if .Notes -}}
+## Changes by Kind
+{{ range .Notes}}
+### {{.Kind | prettyKind}}
+{{range \$note := .NoteEntries }}{{println " -" \$note}}{{end}}
+{{- end -}}
+{{- end -}}
+EOF
+
+
 $RN --org=containers --repo=podman \
     --branch=$WANT \
     --repo-path=/var/tmp/pmpm$$ \
@@ -22,7 +50,10 @@ $RN --org=containers --repo=podman \
     --start-sha=$start_sha \
     --end-sha=$end_sha \
     --output=/tmp/esm-esm.md \
-    --toc
+    --toc \
+    --go-template=go-template:$template
+
+rm -f $template
 
 git checkout podman-release-notes
 mv /tmp/esm-esm.md $WANT.md
