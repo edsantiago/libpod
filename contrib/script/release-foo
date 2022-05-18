@@ -14,7 +14,8 @@ git fetch upstream
 git checkout $WANT
 git pull
 
-start_sha=$(git merge-base $WANT main)
+# Most recent release
+start_tag=$(git describe --tags --abbrev=0)
 end_sha=$(git rev-parse HEAD)
 
 # Write template file
@@ -23,9 +24,9 @@ cat >| $template <<EOF
 # Podman $WANT
 
 The release notes have been generated for the commit range
-[FIXME...FIXME](https://github.com/containers/podman/compare/FIXME...FIXME) on $WANT.
+[${start_tag}...${end_sha}](https://github.com/containers/podman/compare/${start_tag}...${end_sha}) on $(date).
 
-# Changelog since FIXME-starttag
+# Changelog since $start_tag
 
 {{with .NotesWithActionRequired -}}
 ## Urgent Upgrade Notes
@@ -47,7 +48,7 @@ $RN --org=containers --repo=podman \
     --branch=$WANT \
     --repo-path=/var/tmp/pmpm$$ \
     --required-author= \
-    --start-sha=$start_sha \
+    --start-rev=$start_tag \
     --end-sha=$end_sha \
     --output=/tmp/esm-esm.md \
     --toc \
