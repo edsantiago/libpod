@@ -4,7 +4,8 @@ ME=$(basename $0)
 
 set -ex
 
-RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
+#RN=/home/esm/src/atomic/2018-02.podman/cri-o/build/bin/release-notes
+RN=/home/esm/go/bin/release-notes
 
 # FIXME
 #WANT=v4.1
@@ -53,6 +54,7 @@ $RN --org=containers --repo=podman \
     --end-sha=$end_sha \
     --output=/tmp/esm-esm.md \
     --toc \
+    --markdown-links \
     --go-template=go-template:$template
 
 rm -f $template

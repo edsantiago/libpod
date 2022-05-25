@@ -149,3 +149,8 @@ https://github.com/kubernetes/community/blob/master/contributors/guide/release-n
    go get k8s.io/release/cmd/release-notes
 
   (TODO: add kind/api-change label to podman)
+
+2022-05-25 still fails on main:
+
+   INFO Starting to process commit 438 of 1154 (37.95%): 9df3906553fb78c32cd231e5de5de0074a181241
+   FATA gathering release notes: listing release notes: gathering notes: GET https://api.github.com/repos/containers/podman/commits/b7ce9861950aa83631a708f0ed4d74ae4ba88cee/pulls?page=1&per_page=100&state=closed: 403 You have exceeded a secondary rate limit. Please wait a few minutes before you try again. []
