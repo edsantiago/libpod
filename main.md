@@ -12,7 +12,7 @@
 # Podman main
 
 The release notes have been generated for the commit range
-[v4.0.0-rc2...819e5bcb943c6f604fdc65be1c0387055e0a9f20](https://github.com/containers/podman/compare/v4.0.0-rc2...819e5bcb943c6f604fdc65be1c0387055e0a9f20) on Wed May 25 11:37:02 AM MDT 2022.
+[v4.0.0-rc2...819e5bcb943c6f604fdc65be1c0387055e0a9f20](https://github.com/containers/podman/compare/v4.0.0-rc2...819e5bcb943c6f604fdc65be1c0387055e0a9f20) on Wed May 25 12:56:36 PM MDT 2022.
 
 # Changelog since v4.0.0-rc2
 
@@ -20,45 +20,45 @@ The release notes have been generated for the commit range
 
 ### Feature
  - Add new `podman-play-kube@.service` systemd template to dispatch K8s YAML files in systemd.
-  The path to the YAML file must be escaped: `systemctl --user start podman-play-kube@$(systemd-escape $YAML).service` (#14256, @vrothberg)
- - Add new noquota option for volumes (#14051, @giuseppe)
+  The path to the YAML file must be escaped: `systemctl --user start podman-play-kube@$(systemd-escape $YAML).service` ([#14256](https://github.com/containers/podman/pull/14256), [@vrothberg](https://github.com/vrothberg))
+ - Add new noquota option for volumes ([#14051](https://github.com/containers/podman/pull/14051), [@giuseppe](https://github.com/giuseppe))
  - If developer provides a unix domain socket whose name matches machine_events.*\.sock in  XDG_RUNTIME_DIR/podman
   or by setting the environment variable PODMAN_MACHINE_EVENTS_SOCK, then podman machine will publish events to
-  that socket using the Event type from the events package rendered in JSON. (#14085, @jwhonce)
- - Podman pod create --share now supports "+" prefix, allowing users to add to default namespaces (#14333, @rhatdan)
+  that socket using the Event type from the events package rendered in JSON. ([#14085](https://github.com/containers/podman/pull/14085), [@jwhonce](https://github.com/jwhonce))
+ - Podman pod create --share now supports "+" prefix, allowing users to add to default namespaces ([#14333](https://github.com/containers/podman/pull/14333), [@rhatdan](https://github.com/rhatdan))
 
 ### Bug or Regression
- - Fix a bug where bind-mounting /dev in conjunction with using --init failed to start the container. (#14281, @vrothberg)
- - Fixed a bug where removing a container with a zombie exec session would fail the first time, but succeed for subsequent calls ([#14252](https://github.com/containers/podman/issues/14252)). (#14258, @mheon)
- - Podman-remote no longer joins user NS (#14010, @vrothberg)
+ - Fix a bug where bind-mounting /dev in conjunction with using --init failed to start the container. ([#14281](https://github.com/containers/podman/pull/14281), [@vrothberg](https://github.com/vrothberg))
+ - Fixed a bug where removing a container with a zombie exec session would fail the first time, but succeed for subsequent calls ([#14252](https://github.com/containers/podman/issues/14252)). ([#14258](https://github.com/containers/podman/pull/14258), [@mheon](https://github.com/mheon))
+ - Podman-remote no longer joins user NS ([#14010](https://github.com/containers/podman/pull/14010), [@vrothberg](https://github.com/vrothberg))
 
 ### Uncategorized
- - Added a Windows tutorial (#14141, @n1hility)
- - Be more precise about the problem when  RunRoot is not writable (#14255, @hiredman)
- - Builds with GPGME now require GPGME ≥ 1.13.0. (#14300, @mtrmac)
- - Fix --sdnotify=conmon to sent the MAINPID once and not twice. (#14215, @vrothberg)
- - Fix a bug in the resolution of images in the Docker compat API when resolving short names for images that do not live on Docker Hub. (#14294, @vrothberg)
- - Fix a bug where the pause image of a Pod with a custom ID mapping could not be built (https://bugzilla.redhat.com/show_bug.cgi?id=2083997). (#14232, @vrothberg)
+ - Added a Windows tutorial ([#14141](https://github.com/containers/podman/pull/14141), [@n1hility](https://github.com/n1hility))
+ - Be more precise about the problem when  RunRoot is not writable ([#14255](https://github.com/containers/podman/pull/14255), [@hiredman](https://github.com/hiredman))
+ - Builds with GPGME now require GPGME ≥ 1.13.0. ([#14300](https://github.com/containers/podman/pull/14300), [@mtrmac](https://github.com/mtrmac))
+ - Fix --sdnotify=conmon to sent the MAINPID once and not twice. ([#14215](https://github.com/containers/podman/pull/14215), [@vrothberg](https://github.com/vrothberg))
+ - Fix a bug in the resolution of images in the Docker compat API when resolving short names for images that do not live on Docker Hub. ([#14294](https://github.com/containers/podman/pull/14294), [@vrothberg](https://github.com/vrothberg))
+ - Fix a bug where the pause image of a Pod with a custom ID mapping could not be built (https://bugzilla.redhat.com/show_bug.cgi?id=2083997). ([#14232](https://github.com/containers/podman/pull/14232), [@vrothberg](https://github.com/vrothberg))
  - Fix an issue in `podman image mount` where the pretty table for multiple images was not printed.
-  - Add auto-completion to `podman search --filter`. (#14341, @vrothberg)
- - Fix memory limit failures when running under a root cgroup (#14308, @n1hility)
- - Fixed a bug where a dangling ID in the database could render Podman unusable. (#14321, @mheon)
- - Fixes premature container termination on Windows when API forwarding is not running (#14250, @n1hility)
- - Fixes runtime warning on podman machine commands on Windows (#14206, @n1hility)
+  - Add auto-completion to `podman search --filter`. ([#14341](https://github.com/containers/podman/pull/14341), [@vrothberg](https://github.com/vrothberg))
+ - Fix memory limit failures when running under a root cgroup ([#14308](https://github.com/containers/podman/pull/14308), [@n1hility](https://github.com/n1hility))
+ - Fixed a bug where a dangling ID in the database could render Podman unusable. ([#14321](https://github.com/containers/podman/pull/14321), [@mheon](https://github.com/mheon))
+ - Fixes premature container termination on Windows when API forwarding is not running ([#14250](https://github.com/containers/podman/pull/14250), [@n1hility](https://github.com/n1hility))
+ - Fixes runtime warning on podman machine commands on Windows ([#14206](https://github.com/containers/podman/pull/14206), [@n1hility](https://github.com/n1hility))
  - Implement --format flag for podman machine inspect. Example:
   
-  $ podman machine inspect foo --format '{{.Name}}' (#14099, @jwhonce)
- - Improve shell completion for the --format option. (#14216, @Luap99)
- - Improved autocompletion for some commands (#14053, @Luap99)
- - Improved handling for the --format option shell completion. (#14263, @Luap99)
- - Improved shell completion for podman create/run --stop-signal. (#14330, @Luap99)
- - Now play kube supports --userns=[auto|host] to run pods in a separate user namespace (#14140, @giuseppe)
- - Podman create/run --network host will use the correct nameservers from the host [#14055](https://github.com/containers/podman/issues/14055) (#14062, @Luap99)
- - Podman pod create now accepts a name argument. (#14334, @rhatdan)
- - Podman system reset now properly deletes all podman machines and associated files. (#14066, @ashley-cui)
- - Results from `podman search` are now truncated by default (#14047, @vrothberg)
- - The RunAsUser, RunAsGroup, SupplementalGroups settings from the pod security context are honored. (#14167, @giuseppe)
- - `podman auto-update` will now create an event. (#14292, @vrothberg)
+  $ podman machine inspect foo --format '{{.Name}}' ([#14099](https://github.com/containers/podman/pull/14099), [@jwhonce](https://github.com/jwhonce))
+ - Improve shell completion for the --format option. ([#14216](https://github.com/containers/podman/pull/14216), [@Luap99](https://github.com/Luap99))
+ - Improved autocompletion for some commands ([#14053](https://github.com/containers/podman/pull/14053), [@Luap99](https://github.com/Luap99))
+ - Improved handling for the --format option shell completion. ([#14263](https://github.com/containers/podman/pull/14263), [@Luap99](https://github.com/Luap99))
+ - Improved shell completion for podman create/run --stop-signal. ([#14330](https://github.com/containers/podman/pull/14330), [@Luap99](https://github.com/Luap99))
+ - Now play kube supports --userns=[auto|host] to run pods in a separate user namespace ([#14140](https://github.com/containers/podman/pull/14140), [@giuseppe](https://github.com/giuseppe))
+ - Podman create/run --network host will use the correct nameservers from the host [#14055](https://github.com/containers/podman/issues/14055) ([#14062](https://github.com/containers/podman/pull/14062), [@Luap99](https://github.com/Luap99))
+ - Podman pod create now accepts a name argument. ([#14334](https://github.com/containers/podman/pull/14334), [@rhatdan](https://github.com/rhatdan))
+ - Podman system reset now properly deletes all podman machines and associated files. ([#14066](https://github.com/containers/podman/pull/14066), [@ashley-cui](https://github.com/ashley-cui))
+ - Results from `podman search` are now truncated by default ([#14047](https://github.com/containers/podman/pull/14047), [@vrothberg](https://github.com/vrothberg))
+ - The RunAsUser, RunAsGroup, SupplementalGroups settings from the pod security context are honored. ([#14167](https://github.com/containers/podman/pull/14167), [@giuseppe](https://github.com/giuseppe))
+ - `podman auto-update` will now create an event. ([#14292](https://github.com/containers/podman/pull/14292), [@vrothberg](https://github.com/vrothberg))
 
 ## Dependencies
 
