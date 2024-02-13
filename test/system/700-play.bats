@@ -511,15 +511,31 @@ _EOF
     TESTDIR=$PODMAN_TMPDIR/testdir
     mkdir -p $TESTDIR
     echo "$testYaml" | sed "s|TESTDIR|${TESTDIR}|g" > $PODMAN_TMPDIR/test.yaml
+    echo READY                                      > $PODMAN_TMPDIR/ready
 
     HOST_PORT=$(random_free_port)
     SERVER=http://127.0.0.1:$HOST_PORT
 
     run_podman run -d --name myyaml -p "$HOST_PORT:80" \
                -v $PODMAN_TMPDIR/test.yaml:/var/www/testpod.yaml:Z \
+               -v $PODMAN_TMPDIR/ready:/var/www/ready:Z \
                -w /var/www \
                $IMAGE /bin/busybox-extras httpd -f -p 80
+
     wait_for_port 127.0.0.1 $HOST_PORT
+    # FIXME: 2024-02-14 TEMPORARY: this and 'if' block below are
+    # instrumentation for #21649.
+    echo "lsof -P -i :$HOST_PORT"
+    lsof -P -i :$HOST_PORT
+    defer-assertion-failures
+    wait_for_command_output "curl -s -S $SERVER/ready" "READY"
+    if [[ "$output" != "READY" ]]; then
+        run_podman ps -a
+        run_podman container inspect myyaml
+        # INSERT YOUR OWN DEBUG COMMANDS HERE
+        immediate-assertion-failures
+    fi
+    immediate-assertion-failures
 
     run_podman kube play $SERVER/testpod.yaml
     run_podman inspect test_pod-test --format "{{.State.Running}}"
