@@ -670,7 +670,7 @@ spec:
     local t1=$SECONDS
     local delta_t=$((t1 - t0))
 
-    if [[ $status -eq 137 ]]; then
+    if [[ $status -eq 137 ]] && [[ -n "$PARALLEL_JOBSLOT" ]]; then
         echo "# FIXME-someday: timeout command exited $status" >&3
     else
         assert "$status" -eq 124 "Exit status from podman"
@@ -680,7 +680,7 @@ spec:
     # parallel, allow 4 more seconds due to system load
     local expect=4
     if [[ -n "$PARALLEL_JOBSLOT" ]]; then
-        expect=$((expect + 4))
+        expect=$((expect + 10))
     fi
     # FIXME: under high load, delta_t can be 12
     assert $delta_t -le $expect \
