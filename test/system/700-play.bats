@@ -660,33 +660,44 @@ spec:
       image: $IMAGE
       command:
       - top
+      - -b
 " > $fname
 
-    # force a timeout to happen so that the kube play command is killed.
-    # We *expect* a timeout exit status (124), but as of September 2024,
-    # when run in parallel, we often see 137.
+    # Run in background, then wait for pod to start running.
+    # This guarantees that when we send the signal (below) we do so
+    # on a running container; signaling during initialization
+    # results in undefined behavior.
+    logfile=$PODMAN_TMPDIR/kube-play.log
+    $PODMAN kube play --wait $fname &> $logfile &
+    local kidpid=$!
+
+    for try in {1..10}; do
+        run_podman '?' container inspect --format '{{.State.Running}}' "$podname-$ctrname"
+        if [[ $status -eq 0 ]] && [[ "$output" = "true" ]]; then
+            break
+        fi
+        sleep 1
+    done
+    wait_for_output "Mem:" "$podname-$ctrname"
+
+    # Send SIGINT to container, and see how long it takes to exit.
     local t0=$SECONDS
-    PODMAN_TIMEOUT=2 run_podman '?' kube play --wait $fname
+    kill -2 $kidpid
+    wait $kidpid
     local t1=$SECONDS
     local delta_t=$((t1 - t0))
 
-    if [[ $status -eq 137 ]] && [[ -n "$PARALLEL_JOBSLOT" ]]; then
-        echo "# FIXME-someday: timeout command exited $status" >&3
-    else
-        assert "$status" -eq 124 "Exit status from podman"
-    fi
-
     # Expectation (in seconds) of when we should time out. When running
-    # parallel, allow 4 more seconds due to system load
+    # parallel, allow longer time due to system load
     local expect=4
     if [[ -n "$PARALLEL_JOBSLOT" ]]; then
-        expect=$((expect + 10))
+        expect=$((expect + 4))
     fi
-    # FIXME: under high load, delta_t can be 12
     assert $delta_t -le $expect \
            "podman kube play did not get killed within $expect seconds"
     # Make sure we actually got SIGTERM and podman printed its message.
-    assert "$output" =~ "Cleaning up containers, pods, and volumes" "kube play printed sigterm message"
+    assert "$(< $logfile)" =~ "Cleaning up containers, pods, and volumes" \
+           "kube play printed sigterm message"
 
     # there should be no containers running or created
     run_podman ps -a --noheading
